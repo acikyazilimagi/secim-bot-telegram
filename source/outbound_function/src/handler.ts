@@ -22,9 +22,12 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
 
     const token = JSON.parse(secret.SecretString).token;
 
+    const messageText = message.message;
+    console.log(messageText);
+    const messageTextEncoded = encodeURIComponent(messageText);
     const url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${
       message.chatid
-    }&parse_mode=Markdown&text=${encodeURIComponent(message.message)}`;
+    }&parse_mode=Markdown&text=${messageTextEncoded}`;
 
     const { status } = await axios.get(url);
 
