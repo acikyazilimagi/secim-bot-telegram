@@ -4,7 +4,7 @@
   "description": "",
   "main": "/dist/handler.js",
   "scripts": {
-    "build": "rm -rf dist node_modules && npm ci && tsc && cp package.json ./dist/ && cd ./dist/ && npm install --only=production"
+    "build": "rm -rf dist node_modules && npm ci && tsc && cp package.json ./dist/ && cd ./dist/ && npm install --no-audit --only=production"
   },
   "author": "",
   "license": "ISC",
