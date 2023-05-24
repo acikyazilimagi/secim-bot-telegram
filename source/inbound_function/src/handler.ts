@@ -2,6 +2,7 @@ import { Context } from "aws-lambda";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
 import { TelegramMessage } from "./application/telegramMessage";
+import { InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton } from "./application/telegramReply";
 import { v4 as uuidv4 } from "uuid";
 
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
@@ -51,10 +52,7 @@ const handleRequest = (bodyMessage: string, context: Context) => {
   if (outgoingMessage) {
     const params = {
       QueueUrl: queueUrl,
-      MessageBody: JSON.stringify({
-        chatid: telegramMessage.message.chat.id,
-        message: outgoingMessage,
-      }),
+      MessageBody: outgoingMessage,
       MessageGroupId: `${telegramMessage.message.chat.id}`,
       MessageDeduplicationId: uuidv4(),
     };
@@ -74,21 +72,54 @@ const handleRequest = (bodyMessage: string, context: Context) => {
 
 const messages: Record<string, string[]> = {
   "/start": [
-    "Merhaba, Müşahit Haritası Telegram Botuna Hoşgeldiniz!",
-    new Date().toISOString(),
-    "ĞÜŞİÖÇIğüşiöçı",
+    "Merhaba, Güvenli Oy Telegram Botuna Mesaj Attınız.Oy Güvenliği Telegram Botu 27 Mayıs 00:00 tarihine kadar deaktif kalacaktır.27 mayıs tarihinden sonra oy tutanakların gerekli yerlere hızlıca ulaşması için tutanak gönderme fonksiyonu açılacaktır. Kısaca türkiyenin her yerinden kolayca tüm tutanakları Telegram aracılığı ile gönderebilceksiniz. Bu süreç boyunca alttaki  butonlara tıklayarak eksik olan müşahitlikleri haritadan görebilir ve gönüllü olabilirsiniz veya gözlemci iseniz genel ipuçları için butona tıklaya bilirsiniz.Her etkileşiminiz için KVKK’mızı kabul etmiş bulunursunuz. [KVKK’mızın PDF Linki](https://www.google.com/)",
   ],
-  "/map": ["[Müşahit Haritası için tıklayınız.](https://www.google.com)"],
+  "/map": ["(www.internetaderesi.com) adresinde seçim süreci boyunca eksik olan müşahit bölgelerini görebilirsiniz. Buralardan eksik bölgelerde gönüllü olup vatandaşlık görevinizi yerine getirebilirsiniz."],
   "/info": [
-    "Seçim surecinde gözlemci iseniz seçim bölgesine gitmeden lütfen yaninizda erzak ve mümkunse powerbank de götürün, Sayim süreçleri Sabah: 06:00 ya kadar sürebiliyor ve bazen partisel gida operasyonlari gecike biliyor.",
-    "Ayni sandigin sayimina en fazla 3 kez itiraz edilebilir. Bkz Madde (Ysk Maddesi) PDF Linki:",
-    "Onceki seçimde sandik basinda 5 adet parti sandik sorumlusu var iken bu sayi 2 ye düstü bundan ötürü gözlemciler seçim seffaligi adina ok kritik önem tasiyor.",
+    "Seçim sürecinde gözlemci iseniz seçim bölgesine gitmeden lütfen yanınızda erzak ve mümkünse powerbank de götürün, Sayım süreçleri Sabah: 06:00 ya kadar sürebiliyor ve bazen partisel gıda operasyonları gecike biliyor",
+    "Aynı sandığın sayımına en fazla 3 kez itiraz edilebilir. Bkz Madde (Ysk Maddesi) PDF Linki :",
+    "Önceki seçimde sandık başında 5 adet parti sandık sorumlusu var iken bu sayı 2 ye düştü bundan ötürü gözlemciler seçim şeffalığı adına çok kritik önem taşıyor.",
   ],
 };
 
+const buttons: Record<string, InlineKeyboardButton> = {
+  "musahit": {
+    text: "Müşahit Haritası",
+    url: "https://www.musahitharita.com/",
+  },
+  "gozlemci": {
+    text: "Gözlemcilik Haritası",
+    url: "https://www.gozlemciharita.com/",
+  },
+}
+
 function handleMessage(telegramMessage: TelegramMessage) {
   const input = telegramMessage.message.text?.toLowerCase();
-  return input == "/time"
-    ? new Date().toISOString()
-    : messages[input]?.join(" ") || input;
+  var text: string | null = null;
+  var reply_markup: string | null = null;
+  switch (input) {
+    case "/start":
+      const inlineKeyboard: InlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            buttons["musahit"],
+          ],
+          [
+            buttons["gozlemci"],
+          ]
+        ]
+      }
+      reply_markup = JSON.stringify(inlineKeyboard);
+
+    default:
+      text = messages[input]?.join(" ");
+      break;
+  }
+
+  return JSON.stringify({
+    chat_id: telegramMessage.message.chat.id,
+    text: text,
+    reply_markup: reply_markup,
+  })
 }
+
