@@ -113,10 +113,11 @@ resource "aws_iam_role_policy_attachment" "outbound_lambda_execution_role_Policy
 
 #Sets the inbound SQS as a lamnda trigger.
 resource "aws_lambda_event_source_mapping" "event_source_mapping_outbound" {
-  event_source_arn = aws_sqs_queue.outbound_queue.arn
-  enabled          = true
-  function_name    = aws_lambda_function.lambda_outbound_function.arn
-  batch_size       = 1
+  event_source_arn        = aws_sqs_queue.outbound_queue.arn
+  enabled                 = true
+  function_name           = aws_lambda_function.lambda_outbound_function.arn
+  batch_size              = 10
+  function_response_types = ["ReportBatchItemFailures"]
 
   depends_on = [
     aws_iam_role_policy_attachment.outbound_lambda_execution_role_Policy_sqs
