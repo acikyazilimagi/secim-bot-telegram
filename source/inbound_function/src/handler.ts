@@ -52,8 +52,8 @@ const handleRequest = (bodyMessage: string, context: Context) => {
     const params = {
       QueueUrl: queueUrl,
       MessageBody: JSON.stringify({
-        chatid: telegramMessage.message.chat.id,
-        message: outgoingMessage,
+        chat_id: telegramMessage.message.chat.id,
+        text: outgoingMessage,
       }),
       MessageGroupId: `${telegramMessage.message.chat.id}`,
       MessageDeduplicationId: uuidv4(),
@@ -88,7 +88,5 @@ const messages: Record<string, string[]> = {
 
 function handleMessage(telegramMessage: TelegramMessage) {
   const input = telegramMessage.message.text?.toLowerCase();
-  return input == "/time"
-    ? new Date().toISOString()
-    : messages[input]?.join(" ") || input;
+  return messages[input]?.join(" ");
 }
