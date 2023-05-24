@@ -8,7 +8,7 @@ locals {
   
   inbound_queue_name = "${local.app_prefix}-InboundQueue.fifo"
   inbound_api_name = "${local.app_prefix}-InboundApi"
-  inbound_api_resource_path = "tgbot"
+  inbound_api_resource_path = "phase1"
   inbound_api_execution_role = "${local.app_prefix}-InboundApiGatewayRole"
   inbound_api_stage_name = local.environment
 
