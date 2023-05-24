@@ -63,7 +63,7 @@ resource "aws_api_gateway_rest_api" "inbound_api_gateway" {
 #Creates an Api Gateway Resource
 resource "aws_api_gateway_resource" "inbound_api_gateway_inbound_resource" {
   parent_id   = aws_api_gateway_rest_api.inbound_api_gateway.root_resource_id
-  path_part   = local.inbound_api_resource_pah
+  path_part   = local.inbound_api_resource_path
   rest_api_id = aws_api_gateway_rest_api.inbound_api_gateway.id
 
   depends_on = [
