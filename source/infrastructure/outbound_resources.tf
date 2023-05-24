@@ -1,8 +1,16 @@
 #Creates the outbound queue.
-resource "aws_sqs_queue" "outbound_queue" {
-  name = local.outbound_queue_name
+resource "aws_sqs_queue" "outbound_queue_deadletter" {
+  name       = local.outbound_queue_deadletter_name
   fifo_queue = true
+}
+resource "aws_sqs_queue" "outbound_queue" {
+  name                        = local.outbound_queue_name
+  fifo_queue                  = true
   content_based_deduplication = false
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.outbound_queue_deadletter.arn
+    maxReceiveCount     = 10
+  })
 }
 
 #Creates the role to be assumed by the Lambda function.

@@ -50,8 +50,8 @@ resource "aws_lambda_function" "inbound_lambda_function" {
 
   environment {
     variables = {
-      AWSRegion = local.aws_region,
-      AWSAccountID = local.aws_account_id,
+      AWSRegion         = local.aws_region,
+      AWSAccountID      = local.aws_account_id,
       OutboundQueueName = local.outbound_queue_name
     }
   }
