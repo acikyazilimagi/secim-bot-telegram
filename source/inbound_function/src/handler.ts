@@ -46,7 +46,7 @@ const handleRequest = (bodyMessage: string, context: Context) => {
   const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
 
   const telegramMessage: TelegramMessage = JSON.parse(bodyMessage);
-  const outgoingMessage = handleMessage(telegramMessage).normalize('NFD').replace(/[\u0300-\u036f]/g, '');;
+  const outgoingMessage = handleMessage(telegramMessage);
 
   if (outgoingMessage) {
     const params = {
