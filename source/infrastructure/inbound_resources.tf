@@ -93,14 +93,16 @@ resource "aws_api_gateway_integration" "inbound_api_gateway_inbound_resource_pos
   integration_http_method = "POST"
   uri = "arn:aws:apigateway:${local.aws_region}:sqs:path/${local.aws_account_id}/${local.inbound_queue_name}"
   credentials = aws_iam_role.inbound_api_gateway_role.arn
- 
+
   request_parameters = {
     "integration.request.header.Content-Type" = "'application/x-www-form-urlencoded'"
   }
 
+  passthrough_behavior = "NEVER"
   request_templates = {
     "application/json" = "Action=SendMessage&MessageGroupId=$context.requestId&MessageDeduplicationId=$context.requestId&MessageBody=$util.base64Encode($input.body)"
   }
+
 
   depends_on = [
     aws_api_gateway_rest_api.inbound_api_gateway,
