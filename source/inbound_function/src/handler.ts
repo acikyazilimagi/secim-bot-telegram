@@ -6,10 +6,51 @@ import { InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton } from "./ap
 import { v4 as uuidv4 } from "uuid";
 
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
+  const failedMessageIds: string[] = [];
+  const region = process.env.AWS_REGION;
+  const awsAccountID = context.invokedFunctionArn.split(":")[4];
+
+  for (const record of event.Records) {
+    try {
+      const bodyMessage = Buffer.from(record.body, "base64").toString("binary");
+      console.log(`Processing ${record.messageId}`);
+      await handleRecord(region, awsAccountID, bodyMessage).then(
+        () => console.log(`Successfully processed ${record.messageId}`)
+      ).catch(
+        () => {
+          console.log(`Failed message ${record.messageId}`);
+          failedMessageIds.push(record.messageId);
+        }
+      );
+    } catch (error) {
+      console.error(error);
+      failedMessageIds.push(record.messageId);
+    }
+  };
+
+  console.log({ failedMessageIds });
+
+  return {
+    // https://www.serverless.com/blog/improved-sqs-batch-error-handling-with-aws-lambda
+    // https://docs.aws.amazon.com/prescriptive-guidance/latest/lambda-event-filtering-partial-batch-responses-for-sqs/best-practices-partial-batch-responses.html
+    // https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html#services-sqs-batchfailurereporting
+    batchItemFailures: failedMessageIds.map(id => {
+      return {
+        itemIdentifier: id
+      }
+    })
+  }
+};
+
+interface RequestResponse {
+  telegramMessage: TelegramMessage;
+  queueUrl: string;
+  params?: SendMessageCommand["input"];
+}
+
+const handleRecord = async (region: string | undefined, awsAccountID: string, bodyMessage: string) => {
   try {
-    const region = process.env.AWS_REGION;
-    const bodyMessage = Buffer.from(event.Records[0].body, "base64").toString("binary");
-    const response = handleRequest(bodyMessage, context);
+    const response = handleRequest(bodyMessage, awsAccountID);
 
     if (response.params) {
       const outboundSqsMessage = new SendMessageCommand(response.params);
@@ -32,18 +73,11 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
     console.error(error);
     throw error;
   }
-};
-
-interface RequestResponse {
-  telegramMessage: TelegramMessage;
-  queueUrl: string;
-  params?: SendMessageCommand["input"];
 }
 
-const handleRequest = (bodyMessage: string, context: Context) => {
+const handleRequest = (bodyMessage: string, awsAccountID: string) => {
   const region = process.env.AWS_REGION;
   const qname = process.env.OutboundQueueName;
-  const awsAccountID = context.invokedFunctionArn.split(":")[4];
   const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
 
   const telegramMessage: TelegramMessage = JSON.parse(bodyMessage);

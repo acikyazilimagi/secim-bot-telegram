@@ -1,8 +1,18 @@
 #Creates the inbound queue
-resource "aws_sqs_queue" "inbound_queue" {
-  name = local.inbound_queue_name
+resource "aws_sqs_queue" "inbound_queue_deadletter" {
+  name       = local.inbound_queue_deadletter_name
   fifo_queue = true
+}
+
+
+resource "aws_sqs_queue" "inbound_queue" {
+  name                        = local.inbound_queue_name
+  fifo_queue                  = true
   content_based_deduplication = false
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.inbound_queue_deadletter.arn
+    maxReceiveCount     = 10
+  })
 }
 
 #Creates the role that will be used by the API Gateway to access the SQS queue.
@@ -10,16 +20,16 @@ resource "aws_iam_role" "inbound_api_gateway_role" {
   name = local.inbound_api_execution_role
 
   assume_role_policy = jsonencode({
-          "Version": "2012-10-17",
-          "Statement": [
-              {
-                "Sid": "",
-                "Effect": "Allow",
-                "Principal": { "Service": "apigateway.amazonaws.com" },
-                "Action": "sts:AssumeRole",
-              },
-            ],
-        })
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Sid" : "",
+        "Effect" : "Allow",
+        "Principal" : { "Service" : "apigateway.amazonaws.com" },
+        "Action" : "sts:AssumeRole",
+      },
+    ],
+  })
 }
 
 #Creates the policy allowing posting in the Inbound Queue.
@@ -54,7 +64,7 @@ resource "aws_iam_role_policy_attachment" "sqs-inbound-policy-attach" {
 
 #Creates an API Gateway
 resource "aws_api_gateway_rest_api" "inbound_api_gateway" {
-  name          = local.inbound_api_name
+  name = local.inbound_api_name
   endpoint_configuration {
     types = ["REGIONAL"]
   }
@@ -86,13 +96,13 @@ resource "aws_api_gateway_method" "inbound_api_gateway_inbound_resource_post_met
 
 #Sets the integration for the API Gateway Resource Method to post Messages to SQS Queue.
 resource "aws_api_gateway_integration" "inbound_api_gateway_inbound_resource_post_method_integration" {
-  rest_api_id          = aws_api_gateway_rest_api.inbound_api_gateway.id
-  resource_id          = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
-  http_method          = aws_api_gateway_method.inbound_api_gateway_inbound_resource_post_method.http_method
-  type                 = "AWS"
+  rest_api_id             = aws_api_gateway_rest_api.inbound_api_gateway.id
+  resource_id             = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
+  http_method             = aws_api_gateway_method.inbound_api_gateway_inbound_resource_post_method.http_method
+  type                    = "AWS"
   integration_http_method = "POST"
-  uri = "arn:aws:apigateway:${local.aws_region}:sqs:path/${local.aws_account_id}/${local.inbound_queue_name}"
-  credentials = aws_iam_role.inbound_api_gateway_role.arn
+  uri                     = "arn:aws:apigateway:${local.aws_region}:sqs:path/${local.aws_account_id}/${local.inbound_queue_name}"
+  credentials             = aws_iam_role.inbound_api_gateway_role.arn
 
   request_parameters = {
     "integration.request.header.Content-Type" = "'application/x-www-form-urlencoded'"
@@ -113,7 +123,7 @@ resource "aws_api_gateway_integration" "inbound_api_gateway_inbound_resource_pos
 
 #Create an deployment to the API Gateway
 resource "aws_api_gateway_deployment" "inbound_api_gateway_deployment" {
-  rest_api_id = aws_api_gateway_rest_api.inbound_api_gateway.id
+  rest_api_id       = aws_api_gateway_rest_api.inbound_api_gateway.id
   stage_description = "Deployed at ${timestamp()}"
 
 
@@ -174,10 +184,10 @@ resource "aws_api_gateway_method_response" "inbound_api_gateway_inbound_resource
 }
 
 resource "aws_api_gateway_integration_response" "inbound_api_gateway_inbound_resource_post_integration_response_200" {
-  rest_api_id = aws_api_gateway_rest_api.inbound_api_gateway.id
-  resource_id = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
-  http_method = aws_api_gateway_method.inbound_api_gateway_inbound_resource_post_method.http_method
-  status_code = aws_api_gateway_method_response.inbound_api_gateway_inbound_resource_post_method_response_200.status_code
+  rest_api_id       = aws_api_gateway_rest_api.inbound_api_gateway.id
+  resource_id       = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
+  http_method       = aws_api_gateway_method.inbound_api_gateway_inbound_resource_post_method.http_method
+  status_code       = aws_api_gateway_method_response.inbound_api_gateway_inbound_resource_post_method_response_200.status_code
   selection_pattern = "200"
 
   response_templates = {
@@ -193,10 +203,10 @@ resource "aws_api_gateway_integration_response" "inbound_api_gateway_inbound_res
 }
 
 resource "aws_api_gateway_integration_response" "inbound_api_gateway_inbound_resource_post_integration_response_500" {
-  rest_api_id = aws_api_gateway_rest_api.inbound_api_gateway.id
-  resource_id = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
-  http_method = aws_api_gateway_method.inbound_api_gateway_inbound_resource_post_method.http_method
-  status_code = aws_api_gateway_method_response.inbound_api_gateway_inbound_resource_post_method_response_500.status_code
+  rest_api_id       = aws_api_gateway_rest_api.inbound_api_gateway.id
+  resource_id       = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
+  http_method       = aws_api_gateway_method.inbound_api_gateway_inbound_resource_post_method.http_method
+  status_code       = aws_api_gateway_method_response.inbound_api_gateway_inbound_resource_post_method_response_500.status_code
   selection_pattern = ""
 
   response_templates = {
