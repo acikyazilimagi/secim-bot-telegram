@@ -44,3 +44,9 @@ terraform apply
 Terraform will ask you for the bucket name and the secret name from the Secrets Manager.
 
 After terraform finishes the deployment you can set the Telegram Bot WebHook (check the article to understand how).
+
+### Telegram Webhook Commands
+
+GET https://api.telegram.org/bot{{token}}/getWebhookInfo
+
+POST https://api.telegram.org/bot{{token}}/setWebhook?url={{webhook_url}}

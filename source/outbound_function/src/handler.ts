@@ -22,18 +22,24 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
 
     const token = JSON.parse(secret.SecretString).token;
 
-    const messageText = message.message;
-    console.log(messageText);
-    const messageTextEncoded = encodeURIComponent(messageText);
-    const url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${
-      message.chatid
-    }&parse_mode=Markdown&text=${messageTextEncoded}`;
+    const messageText = message.text;
+    const messageReplyMarkup = message.reply_markup;
+    console.log({ messageText, messageReplyMarkup });
+    if (messageText) {
+      const encodedMessageText = encodeURIComponent(messageText);
+      var url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${message.chat_id
+        }&parse_mode=Markdown&text=${encodedMessageText}`;
+      if (messageReplyMarkup) {
+        const encodedReplyMarkup = encodeURIComponent(messageReplyMarkup);
+        url = url.concat(`&reply_markup=${encodedReplyMarkup}`);
+      }
 
-    const { status } = await axios.get(url);
+      const { status } = await axios.get(url);
+      console.log({ status });
+    }
 
-    console.log("status call", status);
   } catch (error) {
-    console.log(error);
+    console.log({ error });
     throw error;
   }
 };

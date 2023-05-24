@@ -1,4 +1,5 @@
 export interface TelegramMessage {
-  chatid: number;
-  message: string;
+  chat_id: number;
+  text?: string;
+  reply_markup?: string;
 }

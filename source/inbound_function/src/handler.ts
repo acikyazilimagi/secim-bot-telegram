@@ -2,6 +2,7 @@ import { Context } from "aws-lambda";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
 import { TelegramMessage } from "./application/telegramMessage";
+import { InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton } from "./application/telegramReply";
 import { v4 as uuidv4 } from "uuid";
 
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
@@ -51,10 +52,7 @@ const handleRequest = (bodyMessage: string, context: Context) => {
   if (outgoingMessage) {
     const params = {
       QueueUrl: queueUrl,
-      MessageBody: JSON.stringify({
-        chatid: telegramMessage.message.chat.id,
-        message: outgoingMessage,
-      }),
+      MessageBody: outgoingMessage,
       MessageGroupId: `${telegramMessage.message.chat.id}`,
       MessageDeduplicationId: uuidv4(),
     };
@@ -75,7 +73,6 @@ const handleRequest = (bodyMessage: string, context: Context) => {
 const messages: Record<string, string[]> = {
   "/start": [
     "Merhaba, Müşahit Haritası Telegram Botuna Hoşgeldiniz!",
-    new Date().toISOString(),
     "ĞÜŞİÖÇIğüşiöçı",
   ],
   "/map": ["[Müşahit Haritası için tıklayınız.](https://www.google.com)"],
@@ -86,9 +83,44 @@ const messages: Record<string, string[]> = {
   ],
 };
 
+const buttons: Record<string, InlineKeyboardButton> = {
+  "musahit": {
+    text: "Müşahit Haritası",
+    url: "https://www.musahitharita.com/",
+  },
+  "gozlemci": {
+    text: "Gözlemcilik Haritası",
+    url: "https://www.gozlemciharita.com/",
+  },
+}
+
 function handleMessage(telegramMessage: TelegramMessage) {
   const input = telegramMessage.message.text?.toLowerCase();
-  return input == "/time"
-    ? new Date().toISOString()
-    : messages[input]?.join(" ") || input;
+  var text: string | null = null;
+  var reply_markup: string | null = null;
+  switch (input) {
+    case "/start":
+      const inlineKeyboard: InlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            buttons["musahit"],
+          ],
+          [
+            buttons["gozlemci"],
+          ]
+        ]
+      }
+      reply_markup = JSON.stringify(inlineKeyboard);
+
+    default:
+      text = messages[input]?.join(" ");
+      break;
+  }
+
+  return JSON.stringify({
+    chat_id: telegramMessage.message.chat.id,
+    text: text,
+    reply_markup: reply_markup,
+  })
 }
+
