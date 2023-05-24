@@ -50,8 +50,8 @@ resource "aws_lambda_function" "inbound_lambda_function" {
 
   environment {
     variables = {
-      AWSRegion = local.aws_region,
-      AWSAccountID = local.aws_account_id,
+      AWSRegion         = local.aws_region,
+      AWSAccountID      = local.aws_account_id,
       OutboundQueueName = local.outbound_queue_name
     }
   }
@@ -100,10 +100,11 @@ resource "aws_iam_role_policy_attachment" "inbound_function_execution_role_Polic
 
 #Sets the inbound SQS as a lamnda trigger.
 resource "aws_lambda_event_source_mapping" "event_source_mapping_inbound_function" {
-  event_source_arn = aws_sqs_queue.inbound_queue.arn
-  enabled          = true
-  function_name    = aws_lambda_function.inbound_lambda_function.arn
-  batch_size       = 1
+  event_source_arn        = aws_sqs_queue.inbound_queue.arn
+  enabled                 = true
+  function_name           = aws_lambda_function.inbound_lambda_function.arn
+  batch_size              = 10
+  function_response_types = ["ReportBatchItemFailures"]
 
   depends_on = [
     aws_iam_role_policy_attachment.inbound_function_execution_role_Policy_sqs
