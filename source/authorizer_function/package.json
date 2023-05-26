@@ -1,0 +1,14 @@
+{
+  "name": "authorizer_function",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.mjs",
+  "scripts": {
+    "build": "rm -rf dist node_modules && npm ci --no-audit  && mkdir ./dist/ && cp index.mjs ./dist/ && cp package.json ./dist/ && cd ./dist/ && npm install --no-audit --only=production"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.338.0"
+  }
+}

@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "@types/node": "^20.2.3"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.338.0"
   }
 }
