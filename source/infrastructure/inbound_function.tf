@@ -73,7 +73,7 @@ resource "aws_iam_policy" "aws_lambda_sqs_inbound_outbound_policy" {
         {
             "Effect": "Allow",
             "Action": [
-              "sqs:SendMessge",
+              "sqs:SendMessage",
               "sqs:DeleteMessage",
               "sqs:ChangeMessageVisibility",
               "sqs:ReceiveMessage",
