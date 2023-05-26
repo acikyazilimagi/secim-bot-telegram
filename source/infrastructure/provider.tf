@@ -8,6 +8,12 @@ terraform {
 
   required_version = ">= 0.14.9"
 }
+
+provider "aws" {
+  alias   = "test"
+  profile = "test"
+  region  = "eu-west-1"
+}
 provider "aws" {
   alias   = "dev"
   profile = "dev"
@@ -19,3 +25,6 @@ provider "aws" {
   profile = "prod"
   region  = "eu-central-1"
 }
+
+
+
