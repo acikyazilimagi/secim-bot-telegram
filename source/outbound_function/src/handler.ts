@@ -50,7 +50,7 @@ async function handleRecord(body: string, token: string) {
     console.log({ messageText, messageReplyMarkup });
     if (messageText) {
       const encodedMessageText = encodeURIComponent(messageText);
-      var url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${message.chat_id}&parse_mode=Markdown&text=${encodedMessageText}`;
+      var url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${message.chat_id}&parse_mode=MarkdownV2&text=${encodedMessageText}`;
       if (messageReplyMarkup) {
         const encodedReplyMarkup = encodeURIComponent(messageReplyMarkup);
         url = url.concat(`&reply_markup=${encodedReplyMarkup}`);

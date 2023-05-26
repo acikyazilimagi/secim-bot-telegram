@@ -13,6 +13,9 @@ locals {
   inbound_api_execution_role    = "${local.app_prefix}-InboundApiGatewayRole"
   inbound_api_stage_name        = local.environment
 
+  authorizer_lambda_execution_role_name = "${local.app_prefix}-AuthorizerLambdaExecutionRole"
+  authorizer_lambda_function_name       = "${local.app_prefix}-Authorizer"
+
   inbound_lambda_execution_role_name = "${local.app_prefix}-InboundLambdaExecutionRole"
   inbound_lambda_function_name       = "${local.app_prefix}-Inbound"
 
