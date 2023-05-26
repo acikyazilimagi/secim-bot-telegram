@@ -50,3 +50,5 @@ After terraform finishes the deployment you can set the Telegram Bot WebHook (ch
 GET https://api.telegram.org/bot{{token}}/getWebhookInfo
 
 POST https://api.telegram.org/bot{{token}}/setWebhook?url={{webhook_url}}
+
+

@@ -3,3 +3,4 @@ node_modules
 terraform.tfstate*
 source/build
 dist/
+.env
