@@ -4,6 +4,7 @@ import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
 import { TelegramMessage } from "./application/telegramMessage";
 import { InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton } from "./application/telegramReply";
 import { v4 as uuidv4 } from "uuid";
+import { OutgoingMessage } from "http";
 
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   const failedMessageIds: string[] = [];
@@ -50,38 +51,31 @@ interface RequestResponse {
 
 const handleRecord = async (region: string | undefined, awsAccountID: string, bodyMessage: string) => {
   try {
-    const response = handleRequest(bodyMessage, awsAccountID);
+    const telegramMessage: TelegramMessage = JSON.parse(bodyMessage);
+    const input = telegramMessage.message.text?.toLowerCase();
 
-    if (response.params) {
-      const outboundSqsMessage = new SendMessageCommand(response.params);
+    let response;
 
-      console.log(JSON.stringify(response));
-      console.log(JSON.stringify({ outboundSqsMessage }));
+    response = handleRequest("/start", awsAccountID, telegramMessage);
+    await queueOutbound(response, region);
+    response = handleRequest("/map", awsAccountID, telegramMessage);
+    await queueOutbound(response, region);
+    response = handleRequest("/info", awsAccountID, telegramMessage);
+    await queueOutbound(response, region);
 
-      const sqsClient = new SQSClient({ region });
 
-      try {
-        const result = await sqsClient.send(outboundSqsMessage);
-        console.log("Success");
-        console.log(JSON.stringify(result));
-      } catch (err) {
-        console.error("Error", err);
-        throw err;
-      }
-    }
   } catch (error) {
     console.error(error);
     throw error;
   }
 }
 
-const handleRequest = (bodyMessage: string, awsAccountID: string) => {
+const handleRequest = (input: string, awsAccountID: string, telegramMessage: TelegramMessage) => {
   const region = process.env.AWS_REGION;
   const qname = process.env.OutboundQueueName;
   const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
 
-  const telegramMessage: TelegramMessage = JSON.parse(bodyMessage);
-  const outgoingMessage = handleMessage(telegramMessage);
+  const outgoingMessage = handleMessage(input, telegramMessage.message.chat.id);
 
   if (outgoingMessage) {
     const params = {
@@ -106,52 +100,82 @@ const handleRequest = (bodyMessage: string, awsAccountID: string) => {
 
 const messages: Record<string, string[]> = {
   "/start": [
-    "Merhaba, Güvenli Oy Telegram Botuna Mesaj Attınız.Oy Güvenliği Telegram Botu 27 Mayıs 00:00 tarihine kadar deaktif kalacaktır.27 mayıs tarihinden sonra oy tutanakların gerekli yerlere hızlıca ulaşması için tutanak gönderme fonksiyonu açılacaktır. Kısaca türkiyenin her yerinden kolayca tüm tutanakları Telegram aracılığı ile gönderebilceksiniz. Bu süreç boyunca alttaki  butonlara tıklayarak eksik olan müşahitlikleri haritadan görebilir ve gönüllü olabilirsiniz veya gözlemci iseniz genel ipuçları için butona tıklaya bilirsiniz.Her etkileşiminiz için KVKK’mızı kabul etmiş bulunursunuz. [KVKK’mızın PDF Linki](https://www.google.com/)",
+    "Merhaba, *Güvenli Oy Telegram Botu*na mesaj attınız\\.",
+    "Oy Güvenliği Telegram Botu 27 Mayıs saat 17:00'ye kadar deaktif kalacaktır\\.",
+    "27 Mayıs tarihinden sonra oy tutanaklarının gerekli yerlere hızlıca ulaşması için tutanak gönderme fonksiyonu açılacaktır\\.",
+    "Ayrıca, eksik oy pusulalarının yerlerini görebilmeniz için eksik oy pusulası haritası da açılacaktır\\.",
+    "Kısacası, Türkiye'nin her yerinden kolayca tüm tutanakları Telegram aracılığıyla gönderebileceksiniz\\.",
+    "Bu süreç boyunca aşağıdaki butonlara tıklayarak eksik olan gözlemci yerlerini haritadan görebilir ve gönüllü olabilirsiniz\\.",
+    "Ayrıca, gözlemciyseniz genel ipuçları için de butona tıklayabilirsiniz\\.",
   ],
-  "/map": ["(www.internetaderesi.com) adresinde seçim süreci boyunca eksik olan müşahit bölgelerini görebilirsiniz. Buralardan eksik bölgelerde gönüllü olup vatandaşlık görevinizi yerine getirebilirsiniz."],
+  "/map": [
+    "[secim\\.gonullu\\.io](https://secim\\.gonullu\\.io) adresinde seçim süreci boyunca eksik olan gözlemci bölgelerini görebilirsiniz\\.Buralarda eksik bölgelerde gönüllü olarak vatandaşlık görevinizi yerine getirebilirsiniz\\."
+  ],
   "/info": [
-    "Seçim sürecinde gözlemci iseniz seçim bölgesine gitmeden lütfen yanınızda erzak ve mümkünse powerbank de götürün, Sayım süreçleri Sabah: 06:00 ya kadar sürebiliyor ve bazen partisel gıda operasyonları gecike biliyor",
-    "Aynı sandığın sayımına en fazla 3 kez itiraz edilebilir. Bkz Madde (Ysk Maddesi) PDF Linki :",
-    "Önceki seçimde sandık başında 5 adet parti sandık sorumlusu var iken bu sayı 2 ye düştü bundan ötürü gözlemciler seçim şeffalığı adına çok kritik önem taşıyor.",
-  ],
+    "Seçim sürecinde gözlemci iseniz, seçim bölgesine gitmeden önce lütfen yanınızda erzak ve mümkünse powerbank gibi yanınıza alabileceğiniz şeyler bulundurun\\. Sayım süreçleri sabah 06:00'ya kadar sürebilir ve bazen partiye özel gıda operasyonları gecikebilir\\.",
+    "Önceki seçimde sandık başında 5 adet parti sandık sorumlusu bulunurken, bu sayı 2'ye düştü\\. Bu nedenle, gözlemciler seçim şeffaflığı açısından son derece önemli hale gelmektedir\\.",
+    "Oy Tutnakları tüm tutanaklar sayıldıktan sonra imzanlanmalıdır\\.",
+    "Herhangi bir usulsüzlük tespit ettiğinizde Barolar Birliği'nin Gözlemciler İçin hazırladığı PDF'yi inceleyebilirsiniz\\. [Link](https://t\\.co/pfN8IJ3kNo)",
+  ]
 };
 
 const buttons: Record<string, InlineKeyboardButton> = {
-  "musahit": {
-    text: "Müşahit Haritası",
-    url: "https://www.musahitharita.com/",
+  "gozlemcilikhakkinda": {
+    text: "Gözlemcilik Hakkında",
+    callback_data: "observerinfo",
   },
-  "gozlemci": {
+  "gozlemcilikharitasi": {
     text: "Gözlemcilik Haritası",
-    url: "https://www.gozlemciharita.com/",
+    callback_data: "observermap",
   },
 }
 
-function handleMessage(telegramMessage: TelegramMessage) {
-  const input = telegramMessage.message.text?.toLowerCase();
+async function queueOutbound(response: { telegramMessage: TelegramMessage; queueUrl: string; params: { QueueUrl: string; MessageBody: string; MessageGroupId: string; MessageDeduplicationId: string; }; } | { telegramMessage: TelegramMessage; queueUrl: string; params?: undefined; }, region: string | undefined) {
+  if (response.params) {
+    const outboundSqsMessage = new SendMessageCommand(response.params);
+
+    console.log(JSON.stringify(response));
+    console.log(JSON.stringify({ outboundSqsMessage }));
+
+    const sqsClient = new SQSClient({ region });
+
+    try {
+      const result = await sqsClient.send(outboundSqsMessage);
+      console.log("Success");
+      console.log(JSON.stringify(result));
+    } catch (err) {
+      console.error("Error", err);
+      throw err;
+    }
+  }
+}
+
+function handleMessage(input: string, chat_id: number) {
+
+  // const input = telegramMessage.message.text?.toLowerCase();
   var text: string | null = null;
   var reply_markup: string | null = null;
   switch (input) {
     case "/start":
-      const inlineKeyboard: InlineKeyboardMarkup = {
-        inline_keyboard: [
-          [
-            buttons["musahit"],
-          ],
-          [
-            buttons["gozlemci"],
-          ]
-        ]
-      }
-      reply_markup = JSON.stringify(inlineKeyboard);
+    // const inlineKeyboard: InlineKeyboardMarkup = {
+    //   inline_keyboard: [
+    //     [
+    //       buttons["gozlemcilikharitasi"],
+    //     ],
+    //     [
+    //       buttons["gozlemcilikhakkinda"],
+    //     ]
+    //   ]
+    // }
+    // reply_markup = JSON.stringify(inlineKeyboard);
 
     default:
-      text = messages[input]?.join(" ");
+      text = messages[input]?.join('\n');
       break;
   }
 
   return JSON.stringify({
-    chat_id: telegramMessage.message.chat.id,
+    chat_id: chat_id,
     text: text,
     reply_markup: reply_markup,
   })
