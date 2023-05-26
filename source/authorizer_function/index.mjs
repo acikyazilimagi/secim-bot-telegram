@@ -47,7 +47,7 @@ var generatePolicy = function (principalId, effect, resource) {
 }
 
 async function readToken() {
-  const secret_name = process.env.TelegramBotApiSecretToken || "TelegramBotApiSecretToken";
+  const secret_name = process.env.TelegramBotToken || "TelegramBotToken";
 
   const client = new SecretsManagerClient({
     region: process.env.AWS_REGION,
@@ -69,7 +69,7 @@ async function readToken() {
   }
   const secret = response.SecretString;
   //   console.log({ secret })
-  return JSON.parse(secret).TelegramBotApiSecretToken;
+  return JSON.parse(secret).apiSecretToken;
 }
 
 
