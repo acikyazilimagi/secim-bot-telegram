@@ -44,6 +44,8 @@ resource "aws_lambda_function" "inbound_lambda_function" {
   runtime = "nodejs16.x"
   handler = "handler.handler"
 
+  timeout = 60
+
   source_code_hash = data.archive_file.inbound_function_zip.output_base64sha256
 
   role = aws_iam_role.inbound_function_lambda_execution_role.arn
