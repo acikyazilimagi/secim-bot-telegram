@@ -44,6 +44,8 @@ resource "aws_lambda_function" "authorizer_lambda_function" {
   runtime = "nodejs16.x"
   handler = "index.handler"
 
+  timeout = 60
+
   source_code_hash = data.archive_file.authorizer_function_zip.output_base64sha256
 
   role = aws_iam_role.authorizer_function_lambda_execution_role.arn

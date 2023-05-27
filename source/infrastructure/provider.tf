@@ -10,11 +10,6 @@ terraform {
 }
 
 provider "aws" {
-  alias   = "test"
-  profile = "test"
-  region  = "eu-west-1"
-}
-provider "aws" {
   alias   = "dev"
   profile = "dev"
   region  = "eu-central-1"
