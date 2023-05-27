@@ -12,6 +12,7 @@
     "@aws-sdk/client-sqs": "^3.100.0",
     "aws-lambda": "^1.0.7",
     "axios": "^0.27.2",
+    "node-fetch": "^2",
     "uuidv4": "^6.2.13"
   },
   "devDependencies": {

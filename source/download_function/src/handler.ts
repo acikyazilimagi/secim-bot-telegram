@@ -1,10 +1,12 @@
 import { Context } from "aws-lambda";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
-import { TelegramMessage } from "./application/telegramMessage";
+import { PhotoSize } from "./application/telegramMessage";
 import * as AWS from "aws-sdk";
-import axios from "axios";
+import axios, { AxiosResponse } from "axios";
 import { read } from "fs";
+import { v4 as uuidv4 } from "uuid";
 
+const fetch = require('node-fetch').default
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   const failedMessageIds: string[] = [];
   const token = await readToken();
@@ -41,23 +43,68 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   };
 };
 
+type DownloadRequest = {
+  chat_id: number,
+  photo: PhotoSize
+}
+
+type TelegramGetFileResponse
+  = {
+    ok: boolean,
+    result: {
+      file_id: string,
+      file_unique_id: string,
+      file_size: number,
+      file_path: string
+    }
+  }
+
 async function handleRecord(body: string, token: string) {
   try {
 
-    const message: TelegramMessage = JSON.parse(body);
-    const messageText = message.text;
-    const messageReplyMarkup = message.reply_markup;
-    console.log({ messageText, messageReplyMarkup });
-    if (messageText) {
-      const encodedMessageText = encodeURIComponent(messageText);
-      var url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${message.chat_id}&parse_mode=MarkdownV2&text=${encodedMessageText}`;
-      if (messageReplyMarkup) {
-        const encodedReplyMarkup = encodeURIComponent(messageReplyMarkup);
-        url = url.concat(`&reply_markup=${encodedReplyMarkup}`);
-      }
-      const { status } = await axios.get(url);
-      console.log({ status });
-    }
+    const message: DownloadRequest = JSON.parse(body);
+    const chat_id = message.chat_id;
+    const photo = message.photo;
+    console.log({ photo, chat_id });
+
+    let url = `https://api.telegram.org/bot${token}/getFile?file_id=${photo.file_id}`;
+
+    console.log(`Calling Telegram GetFile: ${url}`);
+
+    const { result } = await fetch(url).then((res: any) => {
+      console.log({ res });
+      return res.json()
+    }).then((res: any) => {
+      console.log(res)
+      return res as TelegramGetFileResponse
+    })
+
+
+    url = `https://api.telegram.org/file/bot${token}/${result.file_path}`
+    console.log(`Calling Buffer GetPhoto: ${url}`)
+
+
+    const photoBuffer = await axios.get<any, AxiosResponse<ArrayBuffer>>(url, {
+      responseType: "arraybuffer",
+    }).then((res) => {
+      return Buffer.from(res.data)
+    })
+
+
+    console.log("SEND TO S3")
+    const s3photoBucket = new AWS.S3({
+      region:process.env.AWS_REGION 
+    })
+
+    const uploadedImage = await s3photoBucket.upload({
+      Bucket: process.env.DownloadBucket as string,
+      Key: `${chat_id}_${uuidv4()}`,
+      Body: photoBuffer,
+      ContentType: "application/octet-stream"
+    }).promise()
+
+
+
   } catch (error) {
     console.error(error);
     throw error;
@@ -67,6 +114,9 @@ async function handleRecord(body: string, token: string) {
 async function readToken() {
   const secretManagerClient = new AWS.SecretsManager({
     region: process.env.AWS_REGION,
+    accessKeyId:  process.env.accsessKey,
+    secretAccessKey: process.env.accsessSecret,
+    
   });
   const secret = await secretManagerClient
     .getSecretValue({
@@ -80,4 +130,31 @@ async function readToken() {
   const token = JSON.parse(secret.SecretString).token;
   return token;
 }
+
+
+
+const handleTextRequest = (input: string, awsAccountID: string, chatId: number) => {
+  const region = process.env.AWS_REGION;
+  const qname = process.env.OutboundQueueName;
+  const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
+  const chat_id: number = chatId || 0;
+  const outgoingMessage = "Oy Tutanak Fotoğrafınız Gönderildi"
+
+
+  const params = {
+    QueueUrl: queueUrl,
+    MessageBody: outgoingMessage,
+    MessageGroupId: `${chat_id}`,
+    MessageDeduplicationId: uuidv4(),
+  };
+
+  return {
+
+    queueUrl,
+    params,
+  };
+
+
+
+};
 

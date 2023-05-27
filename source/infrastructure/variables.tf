@@ -9,3 +9,6 @@ variable "s3_deployment_bucket" {
 variable "secrets_manager_id" {
   type = string
 }
+variable "s3_download_bucket" {
+  type = string
+}
