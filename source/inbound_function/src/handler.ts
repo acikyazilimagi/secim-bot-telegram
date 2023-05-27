@@ -1,9 +1,8 @@
 import { Context } from "aws-lambda";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
-import { UpdateMessage } from "./application/telegramMessage";
+import { UpdateMessage, PhotoSize } from "./application/telegramMessage";
 import { v4 as uuidv4 } from "uuid";
-import { OutgoingMessage } from "http";
 
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   const failedMessageIds: string[] = [];
@@ -51,17 +50,29 @@ interface RequestResponse {
 const handleRecord = async (region: string | undefined, awsAccountID: string, bodyMessage: string) => {
   try {
     const updateMessage: UpdateMessage = JSON.parse(bodyMessage);
-    const input = updateMessage.message?.text?.toLowerCase();
+    const input = updateMessage.message?.text?.toLowerCase() || "";
+
+    let response;
 
     if (input == "/start") {
-      let response;
+      response = handleTextRequest("/start", awsAccountID, updateMessage);
+      await sendToSqs(response, region);
+      response = handleTextRequest("/map", awsAccountID, updateMessage);
+      await sendToSqs(response, region);
+      response = handleTextRequest("/info", awsAccountID, updateMessage);
+      await sendToSqs(response, region);
+      response = handleTextRequest("/reminder", awsAccountID, updateMessage);
+      await sendToSqs(response, region);
+    }
 
-      response = handleRequest("/start", awsAccountID, updateMessage);
-      await queueOutbound(response, region);
-      response = handleRequest("/map", awsAccountID, updateMessage);
-      await queueOutbound(response, region);
-      response = handleRequest("/info", awsAccountID, updateMessage);
-      await queueOutbound(response, region);
+    if (updateMessage.message?.photo) {
+      const photos: PhotoSize[] = updateMessage.message.photo; 
+      let photo: PhotoSize = photos[photos.length-1];
+      response = handlePhotoRequest(photo, awsAccountID, updateMessage);
+
+      
+
+      await sendToSqs(response, region);
     }
 
   } catch (error) {
@@ -70,12 +81,43 @@ const handleRecord = async (region: string | undefined, awsAccountID: string, bo
   }
 }
 
-const handleRequest = (input: string, awsAccountID: string, updateMessage: UpdateMessage) => {
+const handlePhotoRequest = (input: PhotoSize, awsAccountID: string, updateMessage: UpdateMessage) => {
+  const region = process.env.AWS_REGION;
+  const qname = process.env.DownloadQueueName;
+  const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
+  const chat_id: number = updateMessage.message?.chat?.id || 0;
+  const outgoingMessage = {
+    chat_id: chat_id,
+    photo: input
+  };
+
+  if (outgoingMessage) {
+    const params = {
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(outgoingMessage),
+      MessageGroupId: `${chat_id}`,
+      MessageDeduplicationId: uuidv4(),
+    };
+
+    return {
+      updateMessage,
+      queueUrl,
+      params,
+    };
+  }
+
+  return {
+    updateMessage,
+    queueUrl,
+  };
+};
+
+const handleTextRequest = (input: string, awsAccountID: string, updateMessage: UpdateMessage) => {
   const region = process.env.AWS_REGION;
   const qname = process.env.OutboundQueueName;
   const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
-  const chat_id : number = updateMessage.message?.chat?.id || 0;
-  const outgoingMessage = handleMessage(input, chat_id);
+  const chat_id: number = updateMessage.message?.chat?.id || 0;
+  const outgoingMessage = prepareTextResponse(input, chat_id);
 
   if (outgoingMessage) {
     const params = {
@@ -101,8 +143,8 @@ const handleRequest = (input: string, awsAccountID: string, updateMessage: Updat
 const messages: Record<string, string[]> = {
   "/start": [
     "Merhaba, *Güvenli Oy Telegram Botu*na mesaj attınız\\.",
-    "Oy Güvenliği Telegram Botu 27 Mayıs saat 17:00'ye kadar deaktif kalacaktır\\.",
-    "27 Mayıs tarihinden sonra oy tutanaklarının gerekli yerlere hızlıca ulaşması için tutanak gönderme fonksiyonu açılacaktır\\.",
+    "Oy Güvenliği Telegram Botu 28 Mayıs saat 17:00'ye kadar deaktif kalacaktır\\.",
+    "28 Mayıs tarihinden sonra oy tutanaklarının gerekli yerlere hızlıca ulaşması için tutanak gönderme fonksiyonu açılacaktır\\.",
     "Ayrıca, eksik oy pusulalarının yerlerini görebilmeniz için eksik oy pusulası haritası da açılacaktır\\.",
     "Kısacası, Türkiye'nin her yerinden kolayca tüm tutanakları Telegram aracılığıyla gönderebileceksiniz\\.",
     "Bu süreç boyunca aşağıdaki butonlara tıklayarak eksik olan gözlemci yerlerini haritadan görebilir ve gönüllü olabilirsiniz\\.",
@@ -114,8 +156,12 @@ const messages: Record<string, string[]> = {
   "/info": [
     "Seçim sürecinde gözlemci iseniz, seçim bölgesine gitmeden önce lütfen yanınızda erzak ve mümkünse powerbank gibi yanınıza alabileceğiniz şeyler bulundurun\\. Sayım süreçleri sabah 06:00'ya kadar sürebilir ve bazen partiye özel gıda operasyonları gecikebilir\\.",
     "Önceki seçimde sandık başında 5 adet parti sandık sorumlusu bulunurken, bu sayı 2'ye düştü\\. Bu nedenle, gözlemciler seçim şeffaflığı açısından son derece önemli hale gelmektedir\\.",
-    "Oy Tutnakları tüm tutanaklar sayıldıktan sonra imzanlanmalıdır\\.",
+    "Sonuç Tutanakları tüm tutanaklar sayıldıktan sonra imzanlanmalıdır\\.",
     "Herhangi bir usulsüzlük tespit ettiğinizde Barolar Birliği'nin Gözlemciler İçin hazırladığı PDF'yi inceleyebilirsiniz\\. [Link](https://t\\.co/pfN8IJ3kNo)",
+  ],
+  "/reminder": [
+    "Gözlemci olarak ulaştığınız *ISLAK İMZALI* sonuç tutanak fotoğraflarını aşağıda gönderebilirsiniz\\.",
+    "Haydi şimdi bir fotoğraf göndermeyi deneyin\\!"
   ]
 };
 
@@ -130,27 +176,29 @@ const messages: Record<string, string[]> = {
 //   },
 // }
 
-async function queueOutbound(response: { updateMessage: UpdateMessage; queueUrl: string; params: { QueueUrl: string; MessageBody: string; MessageGroupId: string; MessageDeduplicationId: string; }; } | { updateMessage: UpdateMessage; queueUrl: string; params?: undefined; }, region: string | undefined) {
+const sendToSqs = async (response: { updateMessage: UpdateMessage; queueUrl: string; params: { QueueUrl: string; MessageBody: string; MessageGroupId: string; MessageDeduplicationId: string; }; } | { updateMessage: UpdateMessage; queueUrl: string; params?: undefined; }, region: string | undefined) => {
   if (response.params) {
-    const outboundSqsMessage = new SendMessageCommand(response.params);
+    const outboundSqsMessage = await new SendMessageCommand(response.params);
 
     console.log(JSON.stringify(response));
     console.log(JSON.stringify({ outboundSqsMessage }));
 
-    const sqsClient = new SQSClient({ region });
+    const sqsClient = await new SQSClient({ region });
 
-    try {
-      const result = await sqsClient.send(outboundSqsMessage);
-      console.log("Success");
-      console.log(JSON.stringify(result));
-    } catch (err) {
-      console.error("Error", err);
-      throw err;
+    return await  sqsClient.send(outboundSqsMessage).then(
+    (res)=>{
+      console.log("Succes SQS",res)
     }
+    ).catch(
+      (err)=>{
+        console.log("Error SQS",err)
+      }
+    )
   }
 }
 
-function handleMessage(input: string, chat_id: number) {
+
+function prepareTextResponse(input: string, chat_id: number) {
 
   // const input = updateMessage.message.text?.toLowerCase();
   var text: string | null = null;
