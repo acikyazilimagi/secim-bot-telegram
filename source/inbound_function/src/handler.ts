@@ -3,10 +3,12 @@ import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
 import { UpdateMessage, PhotoSize } from "./application/telegramMessage";
 import { v4 as uuidv4 } from "uuid";
+import { sendToSqs } from "./application/sqsMessage";
+
 
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   const failedMessageIds: string[] = [];
-  const region = process.env.AWS_REGION;
+  const region = process.env.AWS_REGION || "";
   const awsAccountID = context.invokedFunctionArn.split(":")[4];
 
   for (const record of event.Records) {
@@ -41,13 +43,7 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   }
 };
 
-interface RequestResponse {
-  updateMessage: UpdateMessage;
-  queueUrl: string;
-  params?: SendMessageCommand["input"];
-}
-
-const handleRecord = async (region: string | undefined, awsAccountID: string, bodyMessage: string) => {
+const handleRecord = async (region: string, awsAccountID: string, bodyMessage: string) => {
   try {
     const updateMessage: UpdateMessage = JSON.parse(bodyMessage);
     const input = updateMessage.message?.text?.toLowerCase() || "";
@@ -66,11 +62,11 @@ const handleRecord = async (region: string | undefined, awsAccountID: string, bo
     }
 
     if (updateMessage.message?.photo) {
-      const photos: PhotoSize[] = updateMessage.message.photo; 
-      let photo: PhotoSize = photos[photos.length-1];
+      const photos: PhotoSize[] = updateMessage.message.photo;
+      let photo: PhotoSize = photos[photos.length - 1];
       response = handlePhotoRequest(photo, awsAccountID, updateMessage);
 
-      
+
 
       await sendToSqs(response, region);
     }
@@ -81,12 +77,17 @@ const handleRecord = async (region: string | undefined, awsAccountID: string, bo
   }
 }
 
+
+
+
 const handlePhotoRequest = (input: PhotoSize, awsAccountID: string, updateMessage: UpdateMessage) => {
   const region = process.env.AWS_REGION;
   const qname = process.env.DownloadQueueName;
   const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
   const chat_id: number = updateMessage.message?.chat?.id || 0;
+  const user_id: number = updateMessage.message?.from.id || 0;
   const outgoingMessage = {
+    user_id: user_id,
     chat_id: chat_id,
     photo: input
   };
@@ -100,15 +101,11 @@ const handlePhotoRequest = (input: PhotoSize, awsAccountID: string, updateMessag
     };
 
     return {
-      updateMessage,
-      queueUrl,
       params,
     };
   }
 
   return {
-    updateMessage,
-    queueUrl,
   };
 };
 
@@ -128,15 +125,11 @@ const handleTextRequest = (input: string, awsAccountID: string, updateMessage: U
     };
 
     return {
-      updateMessage,
-      queueUrl,
       params,
     };
   }
 
   return {
-    updateMessage,
-    queueUrl,
   };
 };
 
@@ -176,26 +169,6 @@ const messages: Record<string, string[]> = {
 //   },
 // }
 
-const sendToSqs = async (response: { updateMessage: UpdateMessage; queueUrl: string; params: { QueueUrl: string; MessageBody: string; MessageGroupId: string; MessageDeduplicationId: string; }; } | { updateMessage: UpdateMessage; queueUrl: string; params?: undefined; }, region: string | undefined) => {
-  if (response.params) {
-    const outboundSqsMessage = await new SendMessageCommand(response.params);
-
-    console.log(JSON.stringify(response));
-    console.log(JSON.stringify({ outboundSqsMessage }));
-
-    const sqsClient = await new SQSClient({ region });
-
-    return await  sqsClient.send(outboundSqsMessage).then(
-    (res)=>{
-      console.log("Succes SQS",res)
-    }
-    ).catch(
-      (err)=>{
-        console.log("Error SQS",err)
-      }
-    )
-  }
-}
 
 
 function prepareTextResponse(input: string, chat_id: number) {

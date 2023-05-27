@@ -3,19 +3,20 @@ import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
 import { PhotoSize } from "./application/telegramMessage";
 import * as AWS from "aws-sdk";
 import axios, { AxiosResponse } from "axios";
-import { read } from "fs";
 import { v4 as uuidv4 } from "uuid";
-
+import path = require('path');
+import { sendToSqs } from "./application/sqsMessage";
 const fetch = require('node-fetch').default
 export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   const failedMessageIds: string[] = [];
   const token = await readToken();
+  const awsAccountID = context.invokedFunctionArn.split(":")[4];
 
   for (const record of event.Records) {
     try {
       console.log({ record });
       console.log(`Processing ${record.messageId}`);
-      await handleRecord(record.body, token).then(
+      await handleRecord(record.body, token, awsAccountID).then(
         () => console.log(`Successfully processed ${record.messageId}`)
       ).catch(
         () => {
@@ -44,6 +45,7 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
 };
 
 type DownloadRequest = {
+  user_id: number,
   chat_id: number,
   photo: PhotoSize
 }
@@ -59,10 +61,11 @@ type TelegramGetFileResponse
     }
   }
 
-async function handleRecord(body: string, token: string) {
+async function handleRecord(body: string, token: string, awsAccountID: string) {
   try {
 
     const message: DownloadRequest = JSON.parse(body);
+    const user_id = message.user_id;
     const chat_id = message.chat_id;
     const photo = message.photo;
     console.log({ photo, chat_id });
@@ -79,7 +82,7 @@ async function handleRecord(body: string, token: string) {
       return res as TelegramGetFileResponse
     })
 
-
+    const file_ext: string = path.extname(result.file_path);
     url = `https://api.telegram.org/file/bot${token}/${result.file_path}`
     console.log(`Calling Buffer GetPhoto: ${url}`)
 
@@ -93,30 +96,54 @@ async function handleRecord(body: string, token: string) {
 
     console.log("SEND TO S3")
     const s3photoBucket = new AWS.S3({
-      region:process.env.AWS_REGION 
+      region: process.env.AWS_REGION
     })
 
+    const prefix: number = user_id % 100;
     const uploadedImage = await s3photoBucket.upload({
       Bucket: process.env.DownloadBucket as string,
-      Key: `${chat_id}_${uuidv4()}`,
+      Key: `${prefix}/${user_id}_${uuidv4()}${file_ext}`,
       Body: photoBuffer,
       ContentType: "application/octet-stream"
     }).promise()
 
-
-
+    const response = handleTextResponse(user_id, chat_id, awsAccountID);
+    await sendToSqs(response, process.env.AWS_REGION);
   } catch (error) {
     console.error(error);
     throw error;
   }
 }
 
+
+const handleTextResponse = (user_id: number, chat_id: number, awsAccountID: string) => {
+  const region = process.env.AWS_REGION;
+  const qname = process.env.OutboundQueueName;
+  const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
+  const outgoingMessage = {
+    chat_id: chat_id,
+    text: `Teşekkürler\\! Gönderdiğiniz fotoğraf başarıyla sistemimize kaydedildi\\!`,
+  };
+
+
+  const params = {
+    QueueUrl: queueUrl,
+    MessageBody: JSON.stringify(outgoingMessage),
+    MessageGroupId: `${chat_id}`,
+    MessageDeduplicationId: uuidv4(),
+  };
+
+  return {
+    params,
+  };
+
+};
+
 async function readToken() {
   const secretManagerClient = new AWS.SecretsManager({
     region: process.env.AWS_REGION,
-    accessKeyId:  process.env.accsessKey,
+    accessKeyId: process.env.accsessKey,
     secretAccessKey: process.env.accsessSecret,
-    
   });
   const secret = await secretManagerClient
     .getSecretValue({
@@ -133,28 +160,4 @@ async function readToken() {
 
 
 
-const handleTextRequest = (input: string, awsAccountID: string, chatId: number) => {
-  const region = process.env.AWS_REGION;
-  const qname = process.env.OutboundQueueName;
-  const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
-  const chat_id: number = chatId || 0;
-  const outgoingMessage = "Oy Tutanak Fotoğrafınız Gönderildi"
-
-
-  const params = {
-    QueueUrl: queueUrl,
-    MessageBody: outgoingMessage,
-    MessageGroupId: `${chat_id}`,
-    MessageDeduplicationId: uuidv4(),
-  };
-
-  return {
-
-    queueUrl,
-    params,
-  };
-
-
-
-};
 
