@@ -1,7 +1,6 @@
 import { Context } from "aws-lambda";
-import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
-import { UpdateMessage, PhotoSize } from "./application/telegramMessage";
+import { UpdateMessage, PhotoSize, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery } from "./application/telegramMessage";
 import { v4 as uuidv4 } from "uuid";
 import { sendToSqs } from "./application/sqsMessage";
 
@@ -15,14 +14,37 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
     try {
       const bodyMessage = Buffer.from(record.body, "base64").toString("binary");
       console.log(`Processing ${record.messageId}`);
-      await handleRecord(region, awsAccountID, bodyMessage).then(
-        () => console.log(`Successfully processed ${record.messageId}`)
-      ).catch(
-        () => {
-          console.log(`Failed message ${record.messageId}`);
-          failedMessageIds.push(record.messageId);
-        }
-      );
+
+      const parsedBodyMessage = JSON.parse(bodyMessage)
+
+      if (parsedBodyMessage.callback_query) {
+        console.log("Proccesing Callback Query")
+        await handleCallbackQuery(region, awsAccountID, bodyMessage).then(
+          () => console.log(`Successfully processed ${record.messageId}`)
+        ).catch(
+          () => {
+            console.log(`Failed message ${record.messageId}`);
+            failedMessageIds.push(record.messageId);
+          }
+        );
+      } else {
+        console.log("this is message")
+        await handleRecord(region, awsAccountID, bodyMessage).then(
+          () => console.log(`Successfully processed ${record.messageId}`)
+        ).catch(
+          () => {
+            console.log(`Failed message ${record.messageId}`);
+            failedMessageIds.push(record.messageId);
+          }
+        );
+      }
+
+
+
+
+
+
+
     } catch (error) {
       console.error(error);
       failedMessageIds.push(record.messageId);
@@ -43,6 +65,51 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
   }
 };
 
+const handleCallbackQuery = async (region: string, awsAccountID: string, bodyMessage: string) => {
+
+  try {
+
+    const data: {
+      update_id: number
+      callback_query: CallbackQuery
+    } = JSON.parse(bodyMessage);
+    console.log("callback querye hosgeldiniz")
+    console.log(data)
+
+    if (data.callback_query.data) {
+      const callback_data = data.callback_query.data;
+      console.log(`callback query Tanimlaniyor ${callback_data}}`)
+      const region = process.env.AWS_REGION;
+      const qname = process.env.OutboundQueueName;
+      const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
+      const chat_id = data.callback_query.message.chat.id
+      const outgoingMessage = prepareTextResponse(callback_data, chat_id);
+
+      console.log(outgoingMessage)
+
+      const body = {
+        params: {
+          QueueUrl: queueUrl,
+          MessageBody: outgoingMessage,
+          MessageGroupId: `${chat_id}`,
+          MessageDeduplicationId: uuidv4(),
+        }
+      };
+
+      await sendToSqs(body, region);
+
+    }
+  }
+  catch (err) {
+    console.log("callback query err ", err)
+  }
+
+
+}
+
+
+
+
 const handleRecord = async (region: string, awsAccountID: string, bodyMessage: string) => {
   try {
     const updateMessage: UpdateMessage = JSON.parse(bodyMessage);
@@ -53,13 +120,15 @@ const handleRecord = async (region: string, awsAccountID: string, bodyMessage: s
     if (input == "/start") {
       response = handleTextRequest("/start", awsAccountID, updateMessage);
       await sendToSqs(response, region);
-      response = handleTextRequest("/map", awsAccountID, updateMessage);
-      await sendToSqs(response, region);
-      response = handleTextRequest("/info", awsAccountID, updateMessage);
-      await sendToSqs(response, region);
-      response = handleTextRequest("/reminder", awsAccountID, updateMessage);
-      await sendToSqs(response, region);
+      // response = handleTextRequest("/map", awsAccountID, updateMessage);
+      // await sendToSqs(response, region);
+      // response = handleTextRequest("/info", awsAccountID, updateMessage);
+      // await sendToSqs(response, region);
+      // response = handleTextRequest("/reminder", awsAccountID, updateMessage);
+      // await sendToSqs(response, region);
     }
+
+
 
     if (updateMessage.message?.photo) {
       const photos: PhotoSize[] = updateMessage.message.photo;
@@ -70,6 +139,8 @@ const handleRecord = async (region: string, awsAccountID: string, bodyMessage: s
 
       await sendToSqs(response, region);
     }
+
+
 
   } catch (error) {
     console.error(error);
@@ -135,65 +206,90 @@ const handleTextRequest = (input: string, awsAccountID: string, updateMessage: U
 
 const messages: Record<string, string[]> = {
   "/start": [
-    "Merhaba, *Güvenli Oy Telegram Botu*na mesaj attınız\\.",
-    "Oy Güvenliği Telegram Botu 28 Mayıs saat 17:00'ye kadar deaktif kalacaktır\\.",
-    "28 Mayıs tarihinden sonra oy tutanaklarının gerekli yerlere hızlıca ulaşması için tutanak gönderme fonksiyonu açılacaktır\\.",
-    "Ayrıca, eksik oy pusulalarının yerlerini görebilmeniz için eksik oy pusulası haritası da açılacaktır\\.",
-    "Kısacası, Türkiye'nin her yerinden kolayca tüm tutanakları Telegram aracılığıyla gönderebileceksiniz\\.",
-    "Bu süreç boyunca aşağıdaki butonlara tıklayarak eksik olan gözlemci yerlerini haritadan görebilir ve gönüllü olabilirsiniz\\.",
-    "Ayrıca, gözlemciyseniz genel ipuçları için de butona tıklayabilirsiniz\\.",
+    "Merhaba, *Oy Tutanak Telegram Botu*na hoşgeldiniz\\.",
+    "Aşağıdaki butonlara tıklayarak oy tutanağı fotoğrafı gönderebilir, eksik oy tutanakları haritasını görebilir veya genel bilgi alabilirsiniz\\.",
   ],
   "/map": [
-    "[secim\\.gonullu\\.io](https://secim\\.gonullu\\.io) adresinde seçim süreci boyunca eksik olan gözlemci bölgelerini görebilirsiniz\\.Buralarda eksik bölgelerde gönüllü olarak vatandaşlık görevinizi yerine getirebilirsiniz\\."
+    "Eksik oy tutanakları haritası 28 Mayıs günü seçim yasaklarının kaldırılmasını takiben kullanıma açılacaktır\\. Ardından her 10 dakikada bir güncellenmeye başlayacaktır\\.\n",
+    "Yakın çevrenizdeki oy tutanaklarını takip edebilirsiniz ve yakın çevrenizdeki eksik oy tutanaklarını sisteme gönderebilirsiniz\\.\n",
+    "Eksik oy tutanakları haritasına  [secim\\.gonullu\\.io](https://secim\\.gonullu\\.io) adresinden ulaşabilirsiniz\\.",
   ],
   "/info": [
-    "Seçim sürecinde gözlemci iseniz, seçim bölgesine gitmeden önce lütfen yanınızda erzak ve mümkünse powerbank gibi yanınıza alabileceğiniz şeyler bulundurun\\. Sayım süreçleri sabah 06:00'ya kadar sürebilir ve bazen partiye özel gıda operasyonları gecikebilir\\.",
-    "Önceki seçimde sandık başında 5 adet parti sandık sorumlusu bulunurken, bu sayı 2'ye düştü\\. Bu nedenle, gözlemciler seçim şeffaflığı açısından son derece önemli hale gelmektedir\\.",
-    "Sonuç Tutanakları tüm tutanaklar sayıldıktan sonra imzanlanmalıdır\\.",
-    "Herhangi bir usulsüzlük tespit ettiğinizde Barolar Birliği'nin Gözlemciler İçin hazırladığı PDF'yi inceleyebilirsiniz\\. [Link](https://t\\.co/pfN8IJ3kNo)",
+    "\\- Seçim sürecinde gözlemci iseniz, seçim bölgesine gitmeden önce lütfen yanınızda erzak ve mümkünse powerbank gibi yanınıza alabileceğiniz şeyler bulundurun\\. Sayım süreçleri sabah 06:00'ya kadar sürebilir ve bazen partiye özel gıda operasyonları gecikebilir\\.",
+    "\\- Önceki seçimde sandık başında 5 adet parti sandık sorumlusu bulunurken, bu sayı 2'ye düştü\\. Bu nedenle, gözlemciler seçim şeffaflığı açısından son derece önemli hale gelmektedir\\.",
+    "\\- Sonuç Tutanakları tüm tutanaklar sayıldıktan sonra imzanlanmalıdır\\.",
+    "\\- Herhangi bir usulsüzlük tespit ettiğinizde Barolar Birliği'nin Gözlemciler İçin hazırladığı PDF'yi inceleyebilirsiniz\\. [PDF İÇİN TIKLAYIN](https://t\\.co/pfN8IJ3kNo)",
+  ],
+  "/who_are_we": [
+    "Bu Whatsapp Botu'nun sahibi Açık Yazılım ağıdır\\. Botun amacı, siyasilerden bağımsız ve şeffaf bir şekilde oy suistimalini engellemeyi hedeflemektedir\\.\n",
+    "İletişim için:\n",
+    "\\- Twitter: [https://twitter\\.com/acikyazilimagi](https://twitter\\.com/acikyazilimagi)",
+    "\\- Discord:[https://discord\\.gg/itdepremyardim](https://discord\\.gg/itdepremyardim)\n",
   ],
   "/reminder": [
     "Gözlemci olarak ulaştığınız *ISLAK İMZALI* sonuç tutanak fotoğraflarını aşağıda gönderebilirsiniz\\.",
     "Haydi şimdi bir fotoğraf göndermeyi deneyin\\!"
+  ],
+  "/upload_photo": [
+    "Göndermek istediğiniz *ISLAK İMZALI* sonuç tutanak fotoğrafını veya fotoğraflarını lütfen kameraya tam sığacak şekilde, kamera odaklandıktan sonra ve mümkünse iyi ışık alan bir yerde çekiniz\\.",
+    "Ardından Telegram içinde alışık şekilde fotoğrafı veya fotoğrafları bize mesaj olarak gönderin\\.",
+    "Gönderdiğiniz her fotoğraf sistemize başarıyla kaydedildikten sonra bir bilgilendirme cevabı alacksınız\\.",
+    "Gönderdiginiz sonuç tutanaklarının ilgili yerlere iletilecektir\\.",
+    "LÜTFEN *ISLAK İMZALI* SONUÇ TUTANAK FOTOĞRAFLARINIZI GÖNDERİN\\.",
   ]
+  ,
+
 };
 
-// const buttons: Record<string, InlineKeyboardButton> = {
-//   "gozlemcilikhakkinda": {
-//     text: "Gözlemcilik Hakkında",
-//     callback_data: "observerinfo",
-//   },
-//   "gozlemcilikharitasi": {
-//     text: "Gözlemcilik Haritası",
-//     callback_data: "observermap",
-//   },
-// }
+const buttons: Record<string, InlineKeyboardButton> = {
+  "map": {
+    text: "Eksik Oy Tutanakları Haritası",
+    callback_data: "/map"
+  },
+  "info": {
+    text: "Gözlemci olarak dikkat etmem gerekenler",
+    callback_data: "/info"
+  },
+  "who_we_are": {
+    text: "Biz Kimiz",
+    callback_data: "/who_are_we"
+  },
+  "uploadphoto": {
+    text: "Nasıl Tutanak Fotoğrafı Gönderebilirim?",
+    callback_data: "/upload_photo",
+  }
+}
 
 
 
 function prepareTextResponse(input: string, chat_id: number) {
 
   // const input = updateMessage.message.text?.toLowerCase();
+  console.log("Incoming prepare Text Context:" ,input)
+
+  
   var text: string | null = null;
   var reply_markup: string | null = null;
-  switch (input) {
-    case "/start":
-    // const inlineKeyboard: InlineKeyboardMarkup = {
-    //   inline_keyboard: [
-    //     [
-    //       buttons["gozlemcilikharitasi"],
-    //     ],
-    //     [
-    //       buttons["gozlemcilikhakkinda"],
-    //     ]
-    //   ]
-    // }
-    // reply_markup = JSON.stringify(inlineKeyboard);
-
-    default:
+  
+      const inlineKeyboard: InlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            buttons["map"],
+          ],
+          [
+            buttons["info"],
+          ],
+          [
+            buttons["who_we_are"],
+          ],
+          [
+            buttons["uploadphoto"],
+          ],
+        ]
+      }
+      reply_markup = JSON.stringify(inlineKeyboard);
       text = messages[input]?.join('\n');
-      break;
-  }
+  
 
   return JSON.stringify({
     chat_id: chat_id,
