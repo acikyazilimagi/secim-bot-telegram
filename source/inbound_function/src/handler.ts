@@ -1,8 +1,7 @@
 import { Context } from "aws-lambda";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
-import { TelegramMessage } from "./application/telegramMessage";
-import { InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton } from "./application/telegramReply";
+import { UpdateMessage } from "./application/telegramMessage";
 import { v4 as uuidv4 } from "uuid";
 import { OutgoingMessage } from "http";
 
@@ -44,24 +43,24 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
 };
 
 interface RequestResponse {
-  telegramMessage: TelegramMessage;
+  updateMessage: UpdateMessage;
   queueUrl: string;
   params?: SendMessageCommand["input"];
 }
 
 const handleRecord = async (region: string | undefined, awsAccountID: string, bodyMessage: string) => {
   try {
-    const telegramMessage: TelegramMessage = JSON.parse(bodyMessage);
-    const input = telegramMessage.message.text?.toLowerCase();
+    const updateMessage: UpdateMessage = JSON.parse(bodyMessage);
+    const input = updateMessage.message?.text?.toLowerCase();
 
     if (input == "/start") {
       let response;
 
-      response = handleRequest("/start", awsAccountID, telegramMessage);
+      response = handleRequest("/start", awsAccountID, updateMessage);
       await queueOutbound(response, region);
-      response = handleRequest("/map", awsAccountID, telegramMessage);
+      response = handleRequest("/map", awsAccountID, updateMessage);
       await queueOutbound(response, region);
-      response = handleRequest("/info", awsAccountID, telegramMessage);
+      response = handleRequest("/info", awsAccountID, updateMessage);
       await queueOutbound(response, region);
     }
 
@@ -71,30 +70,30 @@ const handleRecord = async (region: string | undefined, awsAccountID: string, bo
   }
 }
 
-const handleRequest = (input: string, awsAccountID: string, telegramMessage: TelegramMessage) => {
+const handleRequest = (input: string, awsAccountID: string, updateMessage: UpdateMessage) => {
   const region = process.env.AWS_REGION;
   const qname = process.env.OutboundQueueName;
   const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
-
-  const outgoingMessage = handleMessage(input, telegramMessage.message.chat.id);
+  const chat_id : number = updateMessage.message?.chat?.id || 0;
+  const outgoingMessage = handleMessage(input, chat_id);
 
   if (outgoingMessage) {
     const params = {
       QueueUrl: queueUrl,
       MessageBody: outgoingMessage,
-      MessageGroupId: `${telegramMessage.message.chat.id}`,
+      MessageGroupId: `${chat_id}`,
       MessageDeduplicationId: uuidv4(),
     };
 
     return {
-      telegramMessage,
+      updateMessage,
       queueUrl,
       params,
     };
   }
 
   return {
-    telegramMessage,
+    updateMessage,
     queueUrl,
   };
 };
@@ -120,18 +119,18 @@ const messages: Record<string, string[]> = {
   ]
 };
 
-const buttons: Record<string, InlineKeyboardButton> = {
-  "gozlemcilikhakkinda": {
-    text: "Gözlemcilik Hakkında",
-    callback_data: "observerinfo",
-  },
-  "gozlemcilikharitasi": {
-    text: "Gözlemcilik Haritası",
-    callback_data: "observermap",
-  },
-}
+// const buttons: Record<string, InlineKeyboardButton> = {
+//   "gozlemcilikhakkinda": {
+//     text: "Gözlemcilik Hakkında",
+//     callback_data: "observerinfo",
+//   },
+//   "gozlemcilikharitasi": {
+//     text: "Gözlemcilik Haritası",
+//     callback_data: "observermap",
+//   },
+// }
 
-async function queueOutbound(response: { telegramMessage: TelegramMessage; queueUrl: string; params: { QueueUrl: string; MessageBody: string; MessageGroupId: string; MessageDeduplicationId: string; }; } | { telegramMessage: TelegramMessage; queueUrl: string; params?: undefined; }, region: string | undefined) {
+async function queueOutbound(response: { updateMessage: UpdateMessage; queueUrl: string; params: { QueueUrl: string; MessageBody: string; MessageGroupId: string; MessageDeduplicationId: string; }; } | { updateMessage: UpdateMessage; queueUrl: string; params?: undefined; }, region: string | undefined) {
   if (response.params) {
     const outboundSqsMessage = new SendMessageCommand(response.params);
 
@@ -153,7 +152,7 @@ async function queueOutbound(response: { telegramMessage: TelegramMessage; queue
 
 function handleMessage(input: string, chat_id: number) {
 
-  // const input = telegramMessage.message.text?.toLowerCase();
+  // const input = updateMessage.message.text?.toLowerCase();
   var text: string | null = null;
   var reply_markup: string | null = null;
   switch (input) {
