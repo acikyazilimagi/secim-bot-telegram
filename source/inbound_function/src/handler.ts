@@ -54,15 +54,16 @@ const handleRecord = async (region: string | undefined, awsAccountID: string, bo
     const telegramMessage: TelegramMessage = JSON.parse(bodyMessage);
     const input = telegramMessage.message.text?.toLowerCase();
 
-    let response;
+    if (input == "/start") {
+      let response;
 
-    response = handleRequest("/start", awsAccountID, telegramMessage);
-    await queueOutbound(response, region);
-    response = handleRequest("/map", awsAccountID, telegramMessage);
-    await queueOutbound(response, region);
-    response = handleRequest("/info", awsAccountID, telegramMessage);
-    await queueOutbound(response, region);
-
+      response = handleRequest("/start", awsAccountID, telegramMessage);
+      await queueOutbound(response, region);
+      response = handleRequest("/map", awsAccountID, telegramMessage);
+      await queueOutbound(response, region);
+      response = handleRequest("/info", awsAccountID, telegramMessage);
+      await queueOutbound(response, region);
+    }
 
   } catch (error) {
     console.error(error);
