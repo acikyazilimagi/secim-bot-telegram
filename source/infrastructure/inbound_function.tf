@@ -44,6 +44,8 @@ resource "aws_lambda_function" "inbound_lambda_function" {
   runtime = "nodejs16.x"
   handler = "handler.handler"
 
+  timeout = 60
+
   source_code_hash = data.archive_file.inbound_function_zip.output_base64sha256
 
   role = aws_iam_role.inbound_function_lambda_execution_role.arn
@@ -53,6 +55,7 @@ resource "aws_lambda_function" "inbound_lambda_function" {
       AWSRegion         = local.aws_region,
       AWSAccountID      = local.aws_account_id,
       OutboundQueueName = local.outbound_queue_name
+      DownloadQueueName = local.download_queue_name
     }
   }
 }
@@ -80,7 +83,7 @@ resource "aws_iam_policy" "aws_lambda_sqs_inbound_outbound_policy" {
               "sqs:PurgeQueue",
               "sqs:GetQueueAttributes"
             ],
-            "Resource": ["${aws_sqs_queue.inbound_queue.arn}", "${aws_sqs_queue.outbound_queue.arn}"]
+            "Resource": ["${aws_sqs_queue.inbound_queue.arn}", "${aws_sqs_queue.outbound_queue.arn}", "${aws_sqs_queue.download_queue.arn}"]
         }
     ]
 }
@@ -88,7 +91,8 @@ EOF
 
   depends_on = [
     aws_sqs_queue.inbound_queue,
-    aws_sqs_queue.outbound_queue
+    aws_sqs_queue.outbound_queue,
+    aws_sqs_queue.download_queue
   ]
 }
 

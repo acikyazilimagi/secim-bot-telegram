@@ -35,13 +35,15 @@ You can check the [MANUAL_STEPS](MANUAL_STEPS.md) for the all the necessary step
 terraform init
 ```
 
-And then:
-
+And then create and select your workspace. 
 ```
-terraform apply
+terraform workspace new dev
+terraform workspace select dev
 ```
-
-Terraform will ask you for the bucket name and the secret name from the Secrets Manager.
+Execute terraform to apply changes.
+```
+terraform apply -var-file dev.auto.tfvars
+```
 
 After terraform finishes the deployment you can set the Telegram Bot WebHook (check the article to understand how).
 
