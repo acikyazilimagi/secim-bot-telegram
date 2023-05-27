@@ -7,6 +7,7 @@ resource "aws_sqs_queue" "download_queue" {
   name                        = local.download_queue_name
   fifo_queue                  = true
   content_based_deduplication = false
+  visibility_timeout_seconds  =  100
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.download_queue_deadletter.arn
     maxReceiveCount     = 10
