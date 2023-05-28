@@ -9,6 +9,7 @@ resource "aws_sqs_queue" "inbound_queue" {
   name                        = local.inbound_queue_name
   fifo_queue                  = true
   content_based_deduplication = false
+  visibility_timeout_seconds  = 100
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.inbound_queue_deadletter.arn
     maxReceiveCount     = 10
@@ -51,22 +52,24 @@ resource "aws_iam_policy" "inbound_sqs_policy" {
 EOF
 }
 
-#Creates the policy allowing posting in the Inbound Queue.
-resource "aws_iam_policy" "auth_lambda_policy" {
+# resource "aws_iam_role_policy" "auth_lambda_invocation_policy" {
+#   name = "default"
+#   role = aws_iam_role.inbound_api_gateway_role.name
 
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Action": "lambda:InvokeFunction",
-      "Effect": "Allow",
-      "Resource": "*"
-    }
-  ]
-}
-EOF
-}
+#   policy = <<EOF
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Action": "lambda:InvokeFunction",
+#       "Effect": "Allow",
+#       "Resource": "${aws_lambda_function.authorizer_lambda_function.arn}"
+#     }
+#   ]
+# }
+# EOF
+# }
+
 
 #Attach the created policy to the created role.
 resource "aws_iam_role_policy_attachment" "sqs-inbound-policy-attach" {
@@ -79,15 +82,15 @@ resource "aws_iam_role_policy_attachment" "sqs-inbound-policy-attach" {
   ]
 }
 
-resource "aws_iam_role_policy_attachment" "auth-lambda_policy-policy-attach" {
-  role       = aws_iam_role.inbound_api_gateway_role.name
-  policy_arn = aws_iam_policy.auth_lambda_policy.arn
+# resource "aws_iam_role_policy_attachment" "auth-lambda_policy-policy-attach" {
+#   role       = aws_iam_role.inbound_api_gateway_role.name
+#   policy_arn = aws_iam_policy.auth_lambda_policy.arn
 
-  depends_on = [
-    aws_iam_role.inbound_api_gateway_role,
-    aws_iam_policy.auth_lambda_policy
-  ]
-}
+#   depends_on = [
+#     aws_iam_role.inbound_api_gateway_role,
+#     aws_iam_policy.auth_lambda_policy
+#   ]
+# }
 
 
 #Creates an API Gateway
@@ -98,6 +101,17 @@ resource "aws_api_gateway_rest_api" "inbound_api_gateway" {
   }
   api_key_source = "AUTHORIZER"
 
+}
+
+resource "aws_lambda_permission" "lambda_permission" {
+  statement_id  = "AllowAuthorizerFunctionInvokeByAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = local.authorizer_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+
+  # The /* part allows invocation from any stage, method and resource path
+  # within API Gateway.
+  source_arn = "${aws_api_gateway_rest_api.inbound_api_gateway.execution_arn}/*"
 }
 
 #Creates an Api Gateway Resource
@@ -113,10 +127,9 @@ resource "aws_api_gateway_resource" "inbound_api_gateway_inbound_resource" {
 
 #Creates an API Gateway Resource Method
 resource "aws_api_gateway_method" "inbound_api_gateway_inbound_resource_post_method" {
-  # authorization = "CUSTOM"
-  # authorizer_id = aws_api_gateway_authorizer.inbound_api_gateway_inbound_authorizer.id 
-  # TODO
-  authorization = "NONE"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.inbound_api_gateway_inbound_authorizer.id 
+  # authorization = "NONE"
   http_method   = "POST"
   resource_id   = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
   rest_api_id   = aws_api_gateway_rest_api.inbound_api_gateway.id
@@ -128,7 +141,7 @@ resource "aws_api_gateway_method" "inbound_api_gateway_inbound_resource_post_met
 }
 
 resource "aws_api_gateway_authorizer" "inbound_api_gateway_inbound_authorizer" {
-  name           = "Auhtorizer"
+  name           = "Authorizer"
   rest_api_id    = aws_api_gateway_rest_api.inbound_api_gateway.id
   authorizer_uri = aws_lambda_function.authorizer_lambda_function.invoke_arn
   # authorizer_credentials = aws_iam_role.invocation_role.arn
