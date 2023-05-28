@@ -1,6 +1,6 @@
 import { Context } from "aws-lambda";
 import { LambdaFunctionEvent } from "./application/lambdaFunctionEvent";
-import { UpdateMessage, PhotoSize, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery } from "./application/telegramMessage";
+import { UpdateMessage, PhotoSize, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Document, Message } from "./application/telegramMessage";
 import { v4 as uuidv4 } from "uuid";
 import { sendToSqs } from "./application/sqsMessage";
 
@@ -27,7 +27,7 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
             failedMessageIds.push(record.messageId);
           }
         );
-      } else {
+      } else if (parsedBodyMessage.message) {
         console.log("this is message")
         await handleRecord(region, awsAccountID, bodyMessage).then(
           () => console.log(`Successfully processed ${record.messageId}`)
@@ -38,12 +38,6 @@ export const handler = async (event: LambdaFunctionEvent, context: Context) => {
           }
         );
       }
-
-
-
-
-
-
 
     } catch (error) {
       console.error(error);
@@ -134,14 +128,35 @@ const handleRecord = async (region: string, awsAccountID: string, bodyMessage: s
       const photos: PhotoSize[] = updateMessage.message.photo;
       let photo: PhotoSize = photos[photos.length - 1];
       response = handlePhotoRequest(photo, awsAccountID, updateMessage);
-
-
-
       await sendToSqs(response, region);
     }
 
+    if (updateMessage.message?.document) {
+      const document: Document = updateMessage.message.document;
+      console.log("document is sent.");
+      if (document.mime_type?.startsWith("image")) {
+        console.log("Sent document is image.");
+        let photo: PhotoSize = {
+          file_id: document.file_id,
+          width: 0,
+          height: 0,
+          file_size: document.file_size,
+          file_unique_id: document.file_unique_id
+        }
+        response = handlePhotoRequest(photo, awsAccountID, updateMessage);
+        await sendToSqs(response, region);
 
+      } else {
+        response = handleTextRequest("/invalid_document_format", awsAccountID, updateMessage, false);
+        await sendToSqs(response, region);
+      }
+    }
 
+    const message: Message | undefined = updateMessage.message;
+    if (message?.video || message?.video_note || message?.audio || message?.poll || message?.contact || message?.game || message?.voice) {
+      response = handleTextRequest("/invalid_message_format", awsAccountID, updateMessage, false);
+      await sendToSqs(response, region);
+    }
   } catch (error) {
     console.error(error);
     throw error;
@@ -180,12 +195,12 @@ const handlePhotoRequest = (input: PhotoSize, awsAccountID: string, updateMessag
   };
 };
 
-const handleTextRequest = (input: string, awsAccountID: string, updateMessage: UpdateMessage) => {
+const handleTextRequest = (input: string, awsAccountID: string, updateMessage: UpdateMessage, include_buttons?: boolean) => {
   const region = process.env.AWS_REGION;
   const qname = process.env.OutboundQueueName;
   const queueUrl = `https://sqs.${region}.amazonaws.com/${awsAccountID}/${qname}`;
   const chat_id: number = updateMessage.message?.chat?.id || 0;
-  const outgoingMessage = prepareTextResponse(input, chat_id);
+  const outgoingMessage = prepareTextResponse(input, chat_id, include_buttons);
 
   if (outgoingMessage) {
     const params = {
@@ -260,41 +275,48 @@ const messages: Record<string, string[]> = {
     "Gönderdiğiniz her fotoğraf sistemize başarıyla kaydedildikten sonra bir bilgilendirme cevabı alacksınız\\.",
     "Gönderdiginiz sonuç tutanaklarının ilgili yerlere iletilecektir\\.",
     "LÜTFEN *ISLAK İMZALI* SONUÇ TUTANAK FOTOĞRAFLARINIZI GÖNDERİN\\.",
-  ]
-  ,
+  ],
+  "/invalid_document_format": [
+    "HATA: Paylaştığınız dosya tipi uygun değildir\\! Lütfen sadece fotoğraf dosyalarını paylaşınız\\. Fotoğraf dışındaki belge, video gibi dosyaları kabul ede*mi*yoruz\\."
+  ],
+  "/invalid_message_format": [
+    "HATA: Paylaştığınız mesaj tipi uygun değildir\\! Lütfen sadece fotoğraf dosyalarını paylaşınız\\. Fotoğraf dışındaki belge, video gibi mesajları kabul ede*mi*yoruz\\."
+  ],
 
 };
 
 
 
-function prepareTextResponse(input: string, chat_id: number) {
+function prepareTextResponse(input: string, chat_id: number, include_buttons: boolean = true) {
 
   // const input = updateMessage.message.text?.toLowerCase();
-  console.log("Incoming prepare Text Context:" ,input)
+  console.log("Incoming prepare Text Context:", input)
 
-  
+
   var text: string | null = null;
   var reply_markup: string | null = null;
-  
-      const inlineKeyboard: InlineKeyboardMarkup = {
-        inline_keyboard: [
-          [
-            buttons["map"],
-          ],
-          [
-            buttons["info"],
-          ],
-          [
-            buttons["who_we_are"],
-          ],
-          [
-            buttons["uploadphoto"],
-          ],
-        ]
-      }
-      reply_markup = JSON.stringify(inlineKeyboard);
-      text = messages[input]?.join('\n');
-  
+
+  if (include_buttons) {
+    const inlineKeyboard: InlineKeyboardMarkup = {
+      inline_keyboard: [
+        [
+          buttons["map"],
+        ],
+        [
+          buttons["info"],
+        ],
+        [
+          buttons["who_we_are"],
+        ],
+        [
+          buttons["uploadphoto"],
+        ],
+      ]
+    }
+    reply_markup = JSON.stringify(inlineKeyboard);
+  }
+  text = messages[input]?.join('\n');
+
 
   return JSON.stringify({
     chat_id: chat_id,
