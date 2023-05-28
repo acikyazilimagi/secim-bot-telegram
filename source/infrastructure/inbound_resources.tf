@@ -128,11 +128,11 @@ resource "aws_api_gateway_resource" "inbound_api_gateway_inbound_resource" {
 #Creates an API Gateway Resource Method
 resource "aws_api_gateway_method" "inbound_api_gateway_inbound_resource_post_method" {
   authorization = "CUSTOM"
-  authorizer_id = aws_api_gateway_authorizer.inbound_api_gateway_inbound_authorizer.id 
+  authorizer_id = aws_api_gateway_authorizer.inbound_api_gateway_inbound_authorizer.id
   # authorization = "NONE"
-  http_method   = "POST"
-  resource_id   = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
-  rest_api_id   = aws_api_gateway_rest_api.inbound_api_gateway.id
+  http_method = "POST"
+  resource_id = aws_api_gateway_resource.inbound_api_gateway_inbound_resource.id
+  rest_api_id = aws_api_gateway_rest_api.inbound_api_gateway.id
 
   depends_on = [
     aws_api_gateway_rest_api.inbound_api_gateway,
