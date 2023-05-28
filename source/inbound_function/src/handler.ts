@@ -204,50 +204,13 @@ const handleTextRequest = (input: string, awsAccountID: string, updateMessage: U
   };
 };
 
-const messages: Record<string, string[]> = {
-  "/start": [
-    "Merhaba, *Oy Tutanak Telegram Botu*na hoşgeldiniz\\.",
-    "Aşağıdaki butonlara tıklayarak oy tutanağı fotoğrafı gönderebilir, eksik oy tutanakları haritasını görebilir veya genel bilgi alabilirsiniz\\.",
-  ],
-  "/map": [
-    "Eksik oy tutanakları haritası 28 Mayıs günü seçim yasaklarının kaldırılmasını takiben kullanıma açılacaktır\\. Ardından her 10 dakikada bir güncellenmeye başlayacaktır\\.\n",
-    "Yakın çevrenizdeki oy tutanaklarını takip edebilirsiniz ve yakın çevrenizdeki eksik oy tutanaklarını sisteme gönderebilirsiniz\\.\n",
-    "Eksik oy tutanakları haritasına  [secim\\.gonullu\\.io](https://secim\\.gonullu\\.io) adresinden ulaşabilirsiniz\\.",
-  ],
-  "/info": [
-    "\\- Seçim sürecinde gözlemci iseniz, seçim bölgesine gitmeden önce lütfen yanınızda erzak ve mümkünse powerbank gibi yanınıza alabileceğiniz şeyler bulundurun\\. Sayım süreçleri sabah 06:00'ya kadar sürebilir ve bazen partiye özel gıda operasyonları gecikebilir\\.",
-    "\\- Önceki seçimde sandık başında 5 adet parti sandık sorumlusu bulunurken, bu sayı 2'ye düştü\\. Bu nedenle, gözlemciler seçim şeffaflığı açısından son derece önemli hale gelmektedir\\.",
-    "\\- Sonuç Tutanakları tüm tutanaklar sayıldıktan sonra imzanlanmalıdır\\.",
-    "\\- Herhangi bir usulsüzlük tespit ettiğinizde Barolar Birliği'nin Gözlemciler İçin hazırladığı PDF'yi inceleyebilirsiniz\\. [PDF İÇİN TIKLAYIN](https://t\\.co/pfN8IJ3kNo)",
-  ],
-  "/who_are_we": [
-    "Bu Whatsapp Botu'nun sahibi Açık Yazılım ağıdır\\. Botun amacı, siyasilerden bağımsız ve şeffaf bir şekilde oy suistimalini engellemeyi hedeflemektedir\\.\n",
-    "İletişim için:\n",
-    "\\- Twitter: [https://twitter\\.com/acikyazilimagi](https://twitter\\.com/acikyazilimagi)",
-    "\\- Discord:[https://discord\\.gg/itdepremyardim](https://discord\\.gg/itdepremyardim)\n",
-  ],
-  "/reminder": [
-    "Gözlemci olarak ulaştığınız *ISLAK İMZALI* sonuç tutanak fotoğraflarını aşağıda gönderebilirsiniz\\.",
-    "Haydi şimdi bir fotoğraf göndermeyi deneyin\\!"
-  ],
-  "/upload_photo": [
-    "Göndermek istediğiniz *ISLAK İMZALI* sonuç tutanak fotoğrafını veya fotoğraflarını lütfen kameraya tam sığacak şekilde, kamera odaklandıktan sonra ve mümkünse iyi ışık alan bir yerde çekiniz\\.",
-    "Ardından Telegram içinde alışık şekilde fotoğrafı veya fotoğrafları bize mesaj olarak gönderin\\.",
-    "Gönderdiğiniz her fotoğraf sistemize başarıyla kaydedildikten sonra bir bilgilendirme cevabı alacksınız\\.",
-    "Gönderdiginiz sonuç tutanaklarının ilgili yerlere iletilecektir\\.",
-    "LÜTFEN *ISLAK İMZALI* SONUÇ TUTANAK FOTOĞRAFLARINIZI GÖNDERİN\\.",
-  ]
-  ,
-
-};
-
 const buttons: Record<string, InlineKeyboardButton> = {
   "map": {
     text: "Eksik Oy Tutanakları Haritası",
     callback_data: "/map"
   },
   "info": {
-    text: "Gözlemci olarak dikkat etmem gerekenler",
+    text: "Gözlemci için Bilgiler",
     callback_data: "/info"
   },
   "who_we_are": {
@@ -259,6 +222,48 @@ const buttons: Record<string, InlineKeyboardButton> = {
     callback_data: "/upload_photo",
   }
 }
+
+const messages: Record<string, string[]> = {
+  "/start": [
+    "*Oy Tutanak Telegram Botu * ",
+    "Merhaba, *Oy Tutanak Telegram Botu*na hoşgeldiniz\\.",
+    "Aşağıdaki butonlara tıklayarak oy tutanağı fotoğrafı gönderebilir, eksik oy tutanakları haritasını görebilir veya genel bilgi alabilirsiniz\\.",
+  ],
+  "/map": [
+    "* Eksik Oy Tutanakları Haritası * ",
+    "Eksik oy tutanakları haritası 28 Mayıs günü seçim yasaklarının kaldırılmasını takiben kullanıma açılacaktır\\. Ardından her 10 dakikada bir güncellenmeye başlayacaktır\\.\n",
+    "Yakın çevrenizdeki oy tutanaklarını takip edebilirsiniz ve yakın çevrenizdeki eksik oy tutanaklarını sisteme gönderebilirsiniz\\.\n",
+    "Eksik oy tutanakları haritasına  [secim\\.gonullu\\.io](https://secim\\.gonullu\\.io) adresinden ulaşabilirsiniz\\.",
+  ],
+  "/info": [
+    "* Gözlemci için Bilgiler * ",
+    "\\- Seçim sürecinde gözlemci iseniz, seçim bölgesine gitmeden önce lütfen yanınızda erzak ve mümkünse powerbank gibi yanınıza alabileceğiniz şeyler bulundurun\\. Sayım süreçleri sabah 06:00'ya kadar sürebilir ve bazen partiye özel gıda operasyonları gecikebilir\\.",
+    "\\- Önceki seçimde sandık başında 5 adet parti sandık sorumlusu bulunurken, bu sayı 2'ye düştü\\. Bu nedenle, gözlemciler seçim şeffaflığı açısından son derece önemli hale gelmektedir\\.",
+    "\\- Sonuç Tutanakları tüm tutanaklar sayıldıktan sonra imzanlanmalıdır\\.",
+    "\\- Herhangi bir usulsüzlük tespit ettiğinizde Barolar Birliği'nin Gözlemciler İçin hazırladığı PDF'yi inceleyebilirsiniz\\. [PDF İÇİN TIKLAYIN](https://t\\.co/pfN8IJ3kNo)",
+  ],
+  "/who_are_we": [
+    "* Biz Kimiz * ",
+    "Bu Whatsapp Botu'nun sahibi Açık Yazılım ağıdır\\. Botun amacı, siyasilerden bağımsız ve şeffaf bir şekilde oy suistimalini engellemeyi hedeflemektedir\\.\n",
+    "İletişim için:\n",
+    "\\- Twitter: [https://twitter\\.com/acikyazilimagi](https://twitter\\.com/acikyazilimagi)",
+    "\\- Discord:[https://discord\\.gg/itdepremyardim](https://discord\\.gg/itdepremyardim)\n",
+  ],
+  "/reminder": [
+    "Gözlemci olarak ulaştığınız *ISLAK İMZALI* sonuç tutanak fotoğraflarını aşağıda gönderebilirsiniz\\.",
+    "Haydi şimdi bir fotoğraf göndermeyi deneyin\\!"
+  ],
+  "/upload_photo": [
+    "* Nasıl Tutanak Fotoğrafı Gönderebilirim\\? * ",
+    "Göndermek istediğiniz *ISLAK İMZALI* sonuç tutanak fotoğrafını veya fotoğraflarını lütfen kameraya tam sığacak şekilde, kamera odaklandıktan sonra ve mümkünse iyi ışık alan bir yerde çekiniz\\.",
+    "Ardından Telegram içinde alışık şekilde fotoğrafı veya fotoğrafları bize mesaj olarak gönderin\\.",
+    "Gönderdiğiniz her fotoğraf sistemize başarıyla kaydedildikten sonra bir bilgilendirme cevabı alacksınız\\.",
+    "Gönderdiginiz sonuç tutanaklarının ilgili yerlere iletilecektir\\.",
+    "LÜTFEN *ISLAK İMZALI* SONUÇ TUTANAK FOTOĞRAFLARINIZI GÖNDERİN\\.",
+  ]
+  ,
+
+};
 
 
 
